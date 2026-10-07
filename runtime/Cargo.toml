@@ -1,0 +1,12 @@
+[package]
+name = "effect_rt"
+version = "0.1.0"
+edition = "2021"
+description = "Rust runtime that mirrors the Effect semantics used by effect2rust-generated servers"
+
+[dependencies]
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+ryu-js = "1"
+form_urlencoded = "1"

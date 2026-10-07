@@ -1,0 +1,61 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: todos
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/todos
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Cache cargo registry and build output
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            runtime/target
+            examples/todos/rust/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('runtime/Cargo.toml', 'runtime/src/**', 'compiler/src/backend.ts') }}
+          restore-keys: cargo-${{ runner.os }}-
+
+      - name: Postgres client and schema
+        run: |
+          command -v psql || (sudo apt-get update && sudo apt-get install -y postgresql-client)
+          psql "$DATABASE_URL" -f examples/todos/schema.sql
+
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      - name: Compiler + BunPgClient tests
+        run: bun test
+      - name: Runtime tests
+        run: cargo test --quiet
+        working-directory: runtime
+
+      - name: Compile the example to Rust
+        run: bun run example:check && bun run example:build
+
+      - name: Contract — @effect/sql-pg vs BunPgClient vs Rust binary
+        run: bun run example:diff

@@ -1,0 +1,166 @@
+[
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "{\"title\":\"first\"}",
+    "contentType": "application/json"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "{\"title\":\"héllo 👋\"}",
+    "contentType": "application/json"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/1"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/2"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/999"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/abc"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/1.5"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/-1"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/1e2"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/0x1"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/%201"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/NaN"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/Infinity"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/99999999999"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/1e400"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/"
+  },
+  {
+    "method": "GET",
+    "path": "/nope"
+  },
+  {
+    "method": "PUT",
+    "path": "/todos/1"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "{\"title\":\"\"}",
+    "contentType": "application/json"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "{\"title\":123}",
+    "contentType": "application/json"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "{\"title\":null}",
+    "contentType": "application/json"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "{\"title\":{\"a\":[1,\"x\",true]}}",
+    "contentType": "application/json"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "{\"title\":1.5e300}",
+    "contentType": "application/json"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "{}",
+    "contentType": "application/json"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "[]",
+    "contentType": "application/json"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "not json",
+    "contentType": "application/json"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "",
+    "contentType": "application/json"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "{\"title\":\"x\",\"extra\":1}",
+    "contentType": "application/json"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "{\"title\":\"c\"}",
+    "contentType": "application/json; charset=utf-8"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "title=formy",
+    "contentType": "application/x-www-form-urlencoded"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "title=a&title=b",
+    "contentType": "application/x-www-form-urlencoded"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "{\"title\":\"x\"}",
+    "contentType": "text/plain"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/3"
+  }
+]

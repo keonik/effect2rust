@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "Preserve",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "exactOptionalPropertyTypes": true,
+    "types": ["bun"]
+  },
+  "include": ["compiler", "bun-pg-client", "contract", "examples"]
+}
