@@ -25,9 +25,9 @@ test("multi-file program: every unsupported construct, at its source", () => {
   expect(out).toContain("skipped 1 helper declaration")
   expect(out).toContain("4 unsupported constructs")
   for (const [loc, msg] of [
-    ["domain.ts:12:29", "unsupported refinement `Schema.trimmed()`"],
-    ["repo.ts:14:16", "unsupported schema `Schema.Array(Schema.Int)`"],
-    ["repo.ts:27:7", "service methods must be arrow functions"],
-    ["repo.ts:26:9", "unsupported Effect `Effect.all("],
+    ["domain.ts:14:10", "unsupported schema `Schema.Trimmed`"],
+    ["repo.ts:20:18", "unsupported schema `Schema.Array(Schema.Int)`"],
+    ["repo.ts:29:46", "service members must be functions"],
+    ["repo.ts:28:9", "unsupported Effect `Effect.all("],
   ]) expect(out).toContain(`multifile/${loc}: ${msg}`)
 }, 60_000)

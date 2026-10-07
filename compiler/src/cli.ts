@@ -112,7 +112,7 @@ if (command === "check") {
   }
   const all = [...errors, ...sqlErrors]
   const count = (n: number, w: string) => `${n} ${n === 1 ? w : w.endsWith("y") ? w.slice(0, -1) + "ies" : w + "s"}`
-  const structs = [...ir.classes.values()].filter((c) => !c.error && !c.name.endsWith("Path")).length
+  const structs = [...ir.classes.values()].filter((c) => !c.error && !c.name.endsWith("Params")).length
   const errs = [...ir.classes.values()].filter((c) => c.error).length
   console.log(`\n  files: ${files.map((f) => rel(f.fileName)).join(", ")}`)
   console.log(`  found: ${count(structs, "schema")}, ${count(errs, "error type")}, ${count(ir.endpoints.length, "endpoint")}, ${count(ir.queries.length, "query")}, ${count(ir.handlers.length, "compiled handler")}`)

@@ -25,19 +25,51 @@
   },
   {
     "method": "GET",
+    "path": "/todos/-1"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/-0"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/+1"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/1.0"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/1e0"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/1e2"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/2147483648"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/99999999999"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/9007199254740993"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/1e400"
+  },
+  {
+    "method": "GET",
     "path": "/todos/abc"
   },
   {
     "method": "GET",
     "path": "/todos/1.5"
-  },
-  {
-    "method": "GET",
-    "path": "/todos/-1"
-  },
-  {
-    "method": "GET",
-    "path": "/todos/1e2"
   },
   {
     "method": "GET",
@@ -57,11 +89,71 @@
   },
   {
     "method": "GET",
-    "path": "/todos/99999999999"
+    "path": "/todos/1."
   },
   {
     "method": "GET",
-    "path": "/todos/1e400"
+    "path": "/todos/.5"
+  },
+  {
+    "method": "GET",
+    "path": "/TODOS/1"
+  },
+  {
+    "method": "GET",
+    "path": "/Todos/1"
+  },
+  {
+    "method": "GET",
+    "path": "//todos/1"
+  },
+  {
+    "method": "GET",
+    "path": "/todos//1"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/1/"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/1?x=1"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/1;jsessionid=x"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/%31"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/%2531"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/a%2Fb"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/%ZZ"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/%E2%82%AC"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/%"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
   },
   {
     "method": "GET",
@@ -69,10 +161,26 @@
   },
   {
     "method": "GET",
+    "path": "/todos"
+  },
+  {
+    "method": "GET",
     "path": "/nope"
   },
   {
+    "method": "GET",
+    "path": "/"
+  },
+  {
     "method": "PUT",
+    "path": "/todos/1"
+  },
+  {
+    "method": "DELETE",
+    "path": "/todos/1"
+  },
+  {
+    "method": "HEAD",
     "path": "/todos/1"
   },
   {
@@ -120,6 +228,18 @@
   {
     "method": "POST",
     "path": "/todos",
+    "body": "null",
+    "contentType": "application/json"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "\"x\"",
+    "contentType": "application/json"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
     "body": "not json",
     "contentType": "application/json"
   },
@@ -132,14 +252,109 @@
   {
     "method": "POST",
     "path": "/todos",
+    "body": "   ",
+    "contentType": "application/json"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "{\"title\":\"x\"} ",
+    "contentType": "application/json"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "{\"title\":\"x\"}garbage",
+    "contentType": "application/json"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "{\"title\":\"x\",}",
+    "contentType": "application/json"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
     "body": "{\"title\":\"x\",\"extra\":1}",
     "contentType": "application/json"
   },
   {
     "method": "POST",
     "path": "/todos",
-    "body": "{\"title\":\"c\"}",
+    "body": "{\"title\":\"a\",\"title\":\"b\"}",
+    "contentType": "application/json"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "﻿{\"title\":\"bom\"}",
+    "contentType": "application/json"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "{\"title\":\"\\ud800\"}",
+    "contentType": "application/json"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "{\"title\":\"\\ud83d\\ude00\"}",
+    "contentType": "application/json"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "{\"title\":\"a\\u0000b\"}",
+    "contentType": "application/json"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "{\"title\":\"tab\\there\"}",
+    "contentType": "application/json"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "{\"title\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"}",
+    "contentType": "application/json"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "{\"title\":\"  </script>\"}",
+    "contentType": "application/json"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "{\"title\":\"no ctype\"}"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "{\"title\":\"upper\"}",
+    "contentType": "APPLICATION/JSON"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "{\"title\":\"charset\"}",
     "contentType": "application/json; charset=utf-8"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "{\"title\":\"spaced\"}",
+    "contentType": "  application/json  ; x=1"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "{\"title\":\"x\"}",
+    "contentType": "text/plain"
   },
   {
     "method": "POST",
@@ -150,17 +365,31 @@
   {
     "method": "POST",
     "path": "/todos",
-    "body": "title=a&title=b",
-    "contentType": "application/x-www-form-urlencoded"
+    "body": "{\"title\":\"x\"}",
+    "contentType": "application/vnd.api+json"
   },
   {
     "method": "POST",
     "path": "/todos",
     "body": "{\"title\":\"x\"}",
-    "contentType": "text/plain"
+    "contentType": "multipart/form-data; boundary=x"
+  },
+  {
+    "method": "POST",
+    "path": "/todos",
+    "body": "{\"title\":\"x\"}",
+    "contentType": "Text/JSON"
   },
   {
     "method": "GET",
     "path": "/todos/3"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/10"
+  },
+  {
+    "method": "GET",
+    "path": "/todos/12"
   }
 ]

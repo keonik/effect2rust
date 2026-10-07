@@ -1,12 +1,17 @@
 [package]
 name = "effect_rt"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
-description = "Rust runtime that mirrors the Effect semantics used by effect2rust-generated servers"
+description = "Rust runtime that mirrors the Effect 4 semantics used by effect2rust-generated servers"
 
 [dependencies]
-axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "json"] }
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"] }
 serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1", features = ["preserve_order"] }
+# arbitrary_precision: numbers are parsed like JSON.parse (f64, overflow → ±Infinity);
+# preserve_order: duplicate keys keep their first position, last value wins (like JSON.parse);
+# raw_value: emit numbers formatted exactly like JSON.stringify.
+serde_json = { version = "1", features = ["arbitrary_precision", "preserve_order", "raw_value"] }
 ryu-js = "1"
-form_urlencoded = "1"
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres", "uuid"] }
+uuid = "1"

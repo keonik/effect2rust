@@ -25,7 +25,7 @@ done
 command -v oha >/dev/null || { echo "needs oha: cargo install oha" >&2; exit 2; }
 
 URL="http://localhost:$PORT"
-wait_up() { for _ in $(seq 1000); do curl -s -o /dev/null "$URL" && return; sleep 0.01; done; }
+wait_up() { for _ in $(seq 1000); do curl -s -o /dev/null "$URL" && return 0; sleep 0.01; done; return 1; }
 rss_sum() { ps -o rss= -g "$1" | awk '{s+=$1} END {print int(s/1024)}'; }
 hwm_sum() { for p in $(ps -o pid= -g "$1"); do awk '/VmHWM/{print $2}' /proc/$p/status 2>/dev/null; done | awk '{s+=$1} END {print int(s/1024)}'; }
 summ() { bun -e 'const r=JSON.parse(await Bun.stdin.text()); const s=r.summary, l=r.latencyPercentiles; console.log(`${Math.round(s.requestsPerSec).toLocaleString().padStart(7)} req/s  p99 ${(l.p99*1000).toFixed(1).padStart(5)}ms`)'; }
@@ -35,7 +35,7 @@ for spec in "${servers[@]}"; do
   [ -n "$SEED" ] && psql -q "$DATABASE_URL" -c "$SEED"
   t0=$(date +%s%N)
   setsid bash -c "cd '$CWD' && $cmd" > /dev/null 2>&1 & pid=$!
-  wait_up
+  if ! wait_up; then echo "$(printf '%-24s' "$name") server didn't start: $cmd" >&2; kill -TERM -- -$pid 2>/dev/null; continue; fi
   startup=$(( ($(date +%s%N) - t0) / 1000000 ))
   sleep 0.5; idle=$(rss_sum $pid)
   oha -z 3s -c "$CONN" --no-tui "$URL${GET:-$POST}" > /dev/null   # warm-up / JIT tier-up

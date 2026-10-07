@@ -1,30 +1,34 @@
-import { HttpApi, HttpApiBuilder, HttpApiEndpoint, HttpApiGroup } from "@effect/platform"
 import { BunHttpServer, BunRuntime } from "@effect/platform-bun"
 import { Config, Effect, Layer, Schema } from "effect"
+import { HttpRouter } from "effect/http"
+import { HttpApi, HttpApiBuilder, HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api"
 import * as BunPgClient from "effect2rust/BunPgClient"
 import { CreateTodo, Todo, TodoNotFound } from "./domain"
 import { TodoRepo } from "./repo"
 
-class TodosGroup extends HttpApiGroup.make("todos")
-  .add(HttpApiEndpoint.get("getTodo", "/todos/:id").setPath(Schema.Struct({ id: Schema.NumberFromString.pipe(Schema.int()) })).addSuccess(Todo).addError(TodoNotFound, { status: 404 }))
-  .add(HttpApiEndpoint.post("createTodo", "/todos").setPayload(CreateTodo).addSuccess(CreateTodo, { status: 201 })) {}
+class TodosGroup extends HttpApiGroup.make("todos").add(
+  HttpApiEndpoint.get("getTodo", "/todos/:id", { params: { id: Schema.Int }, success: Todo, error: TodoNotFound }),
+  HttpApiEndpoint.post("createTodo", "/todos", { payload: CreateTodo, success: Todo.pipe(HttpApiSchema.status(201)) }),
+) {}
 
 class Api extends HttpApi.make("api").add(TodosGroup) {}
 
-const TodosLive = HttpApiBuilder.group(Api, "todos", (handlers) =>
-  Effect.gen(function* () {
+const TodosLive = HttpApiBuilder.group(
+  Api,
+  "todos",
+  Effect.fn(function* (handlers) {
     const repo = yield* TodoRepo
-    return handlers
-      .handle("getTodo", ({ path }) => repo.findById(path.id))
-      .handle("createTodo", ({ payload }) => repo.create(payload).pipe(Effect.orDie))
+    return handlers.handleAll({
+      getTodo: ({ params }) => repo.findById(params.id),
+      createTodo: ({ payload }) => repo.create(payload),
+    })
   }),
 )
 
-HttpApiBuilder.serve().pipe(
-  Layer.provide(HttpApiBuilder.api(Api).pipe(Layer.provide(TodosLive))),
-  Layer.provide(TodoRepo.Default),
-  Layer.provide(BunPgClient.layerConfig({ url: Config.redacted("DATABASE_URL") })),
+const AppLive = HttpRouter.serve(HttpApiBuilder.layer(Api).pipe(Layer.provide(TodosLive)), { disableLogger: true }).pipe(
+  Layer.provide(TodoRepo.layer),
+  Layer.provide(BunPgClient.layerConfig({ url: Config.Redacted("DATABASE_URL") })),
   Layer.provide(BunHttpServer.layer({ port: 3000 })),
-  Layer.launch,
-  BunRuntime.runMain,
 )
+
+Layer.launch(AppLive).pipe(BunRuntime.runMain)

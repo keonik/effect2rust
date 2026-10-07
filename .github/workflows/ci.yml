@@ -38,8 +38,8 @@ jobs:
             ~/.cargo/git
             runtime/target
             examples/todos/rust/target
-          key: cargo-${{ runner.os }}-${{ hashFiles('runtime/Cargo.toml', 'runtime/src/**', 'compiler/src/backend.ts') }}
-          restore-keys: cargo-${{ runner.os }}-
+          key: cargo-v4-${{ runner.os }}-${{ hashFiles('runtime/Cargo.toml', 'runtime/src/**', 'compiler/src/backend.ts') }}
+          restore-keys: cargo-v4-${{ runner.os }}-
 
       - name: Postgres client and schema
         run: |
@@ -57,5 +57,5 @@ jobs:
       - name: Compile the example to Rust
         run: bun run example:check && bun run example:build
 
-      - name: Contract — @effect/sql-pg vs BunPgClient vs Rust binary
+      - name: "Contract: @effect/sql-pg vs BunPgClient vs Rust binary (81 cases)"
         run: bun run example:diff
