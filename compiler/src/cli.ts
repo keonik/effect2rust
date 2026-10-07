@@ -145,7 +145,7 @@ try {
 
   done = step("emit Rust")
   const crate = basename(entry).replace(/\.ts$/, "").replace(/\W/g, "_") + "_server"
-  const emitted = backend(ir, { source: rel(entry), crate, runtimePath: resolve(import.meta.dir, "../../runtime") })
+  const emitted = backend(ir, { source: rel(entry), crate, runtimePath: relative(out, resolve(import.meta.dir, "../../runtime")) })
   for (const [path, content] of Object.entries(emitted)) {
     mkdirSync(dirname(join(out, path)), { recursive: true })
     writeFileSync(join(out, path), content)
