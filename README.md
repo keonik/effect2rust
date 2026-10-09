@@ -4,7 +4,7 @@ Write the server once in [Effect 4](https://effect.website). Get a native Rust b
 that behaves identically, plus a faster Postgres client if you stay on Bun.
 
 ```
-your Effect app ──tsc──▶ lower Effect.gen / Effect.fn to Rust ──▶ Postgres describes every query ──▶ axum + sqlx crate ──cargo──▶ ~2 MB binary
+your Effect app ──tsc──▶ lower Effect.gen / Effect.fn to Rust ──▶ Postgres describes every query ──▶ axum + tokio-postgres crate ──cargo──▶ ~2 MB binary
 ```
 
 This is not an OpenAPI translator. It compiles the program itself: generator bodies, `yield*`,
@@ -102,7 +102,7 @@ How it maps:
 | `Effect.catchTags({ NoSuchElementError: () => new E(...), SqlError: Effect.die })` | `match` on `AppError` variants |
 | `Schema.TaggedError` + `httpApiStatus` | `enum AppError` with `#[serde(tag = "_tag")]`, status per endpoint |
 | `Schema.Class` + checks | struct + decoders for the JSON and StringTree codecs |
-| `SqlSchema.*` | runtime `sqlx` queries; parameter types chosen per value, like the JS driver |
+| `SqlSchema.*` | pipelined `tokio-postgres` queries; parameter types chosen per value, like the JS driver |
 | `HttpRouter` (find-my-way) | `effect_rt::Router`, a port with the same normalization rules |
 | `Context.Service` + `Layer` | plain functions over a `Ctx` |
 
@@ -110,20 +110,51 @@ Some things the compiler catches that `tsc` can't: `Schema.Int` reading a `bigin
 driver returns a BigInt, so the Effect version fails at runtime), a column missing from a
 query's result, and SQL Postgres rejects.
 
-## Results (todos example, 2 vCPU VM: load generator, server and Postgres share the cores)
+## Runtime comparison
 
-| | GET req/s · p99 | POST req/s · p99 | memory | startup |
-|---|---|---|---|---|
-| Effect 4 + `@effect/sql-pg` | 10,520 · 97.8 ms | 6,377 · 37.0 ms | 53→115 MB | 69 ms |
-| Effect 4 + BunPgClient | 11,830 · 9.8 ms | 8,057 · 14.9 ms | 54→99 MB | 70 ms |
-| **Rust (effect2rust)** | **17,991 · 5.4 ms** | **8,291 · 10.1 ms** | **10→16 MB** | **9 ms** |
+`bun run compare` builds and runs the same Effect 4 program on every JS runtime, interpreted and
+compiled, next to the effect2rust binary and hand-written Rust and C++ servers (the performance
+ceiling). Every target first runs the 81-case contract against the reference (Effect on Bun),
+then gets the same load. One run on a 2 vCPU VM where the load generator, server and Postgres
+share the cores, so compare rows, not absolute numbers:
 
-Bun rows are `bun build --compile --minify --bytecode --format=esm` executables with request
-logging off (`HttpRouter.serve(app, { disableLogger: true })`). Effect 4's default per-request
-logging costs about 35% of throughput; the compiled server doesn't log requests.
+| Target | Contract | GET req/s · p99 | POST req/s · p99 | Memory | Startup | Build | Size |
+|---|---|---|---|---|---|---|---|
+| Node 22 | 69/81 (1 root diff) | 5,045 · 190 ms | 3,610 · 79 ms | 170→343 MB | 1,072 ms | | |
+| Deno 2.9 | 69/81 (1 root diff) | 4,430 · 120 ms | 3,469 · 89 ms | 131→398 MB | 595 ms | | |
+| Bun 1.4 | reference | 6,639 · 150 ms | 3,999 · 67 ms | 82→171 MB | 479 ms | | |
+| Node SEA | 69/81 (1 root diff) | 5,311 · 191 ms | 3,813 · 75 ms | 85→147 MB | 229 ms | 8.3 s | 118 MB |
+| `deno compile` | 69/81 (1 root diff) | 4,806 · 120 ms | 4,023 · 80 ms | 152→413 MB | 429 ms | 4.8 s | 186 MB |
+| `bun build --compile` | 81/81 | 6,855 · 151 ms | 4,416 · 63 ms | 54→112 MB | 90 ms | 0.7 s | 82 MB |
+| **Rust (effect2rust)** | **81/81** | **23,249 · 4.9 ms** | **9,902 · 12.4 ms** | **9→16 MB** | **32 ms** | 24 s | 1.6 MB |
+| Rust, hand-written (axum + tokio-postgres) | 31/81 (44 root diffs) | 23,748 · 5.0 ms | 9,681 · 13.6 ms | 10→14 MB | 77 ms | 57 s* | 1.5 MB |
+| C++, hand-written (Drogon) | 35/81 (39 root diffs) | 28,829 · 4.2 ms | 9,264 · 11.6 ms | 14 MB | 51 ms | 10 s* | 324 KB† |
 
-Contract: 81/81 identical across all three. Build: ~75 s clean release build, ~21 s after a
-change, 1.9 MB binary, `target/` ~300 MB.
+<sub>Effect targets use `@effect/sql-pg` and request logging off; Node and Deno run the same program on
+`node:http` (`api-node.ts`), Bun on `Bun.serve` (`api.ts`). JS runtimes are single-threaded;
+Rust and C++ use both cores. Builds marked * are clean builds (the table's 0.2 s were cached).
+† dynamically linked to Drogon. "Root diffs" exclude cascades, where an earlier difference
+shifted auto-increment ids for later requests.</sub>
+
+What this shows:
+
+- **The same Effect program isn't identical across JS runtimes.** On Node and Deno, a JSON body
+  starting with a UTF-8 byte-order mark is a 400; on Bun it's accepted (Bun's `request.text()`
+  strips the BOM). The compiled binary follows its reference exactly.
+- **C/C++ isn't meaningfully faster than Rust here.** Hand-written Rust and C++ are within ~10% of
+  each other (C++ ahead on reads, Rust on writes). What mattered was the database driver:
+  effect2rust doubled its throughput by switching from sqlx to pipelined tokio-postgres, the same
+  technique Drogon uses. effect2rust now runs at ~98% of hand-written Rust and ~80% of C++ on reads,
+  and leads on writes.
+- **Hand-written code pays for its speed in the contract.** The C++ server answers
+  `GET /todos/1.5` and `GET /todos/1e400` with **todo #1** (its integer conversion stops at the
+  first non-digit) and returns 500s for `/todos/abc`; both hand-written servers differ from the
+  Effect API on 40+ of 81 requests. effect2rust matches all 81 while staying in the same
+  performance tier.
+
+`bun run compare -- --no-build --skip-bench` re-runs just the contract. Deno compile downloads
+`denort` unless `DENORT_BIN` points at a local copy; the C++ target needs Drogon
+(`apt install libdrogon-dev libpq-dev libjsoncpp-dev uuid-dev`).
 
 ## Develop
 
@@ -146,4 +177,4 @@ contract/bench.sh --get /todos/500 --post /todos --body '{"title":"x"}' \
 | `runtime/` | `effect_rt`: router, body handling, Schema codecs, value-typed SQL, JS number semantics |
 | `bun-pg-client/` | `BunPgClient` and its tests |
 | `contract/` | `diff.sh` (differential contract test), `bench.sh`, `contract.ts` |
-| `examples/todos/` | The example (`api.ts` on `@effect/sql-pg`, `api-bunpg.ts` on BunPgClient), schema, contract cases |
+| `examples/todos/` | The example (`api.ts` on `@effect/sql-pg`, `api-bunpg.ts` on BunPgClient, `api-node.ts` on `node:http`), schema, contract cases, `compare-runtimes.ts`, hand-written `cpp/` and `rust-handwritten/` baselines |

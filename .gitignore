@@ -4,3 +4,6 @@ examples/*/rust/
 *.cpuprofile
 .env
 runtime/Cargo.lock
+examples/*/.targets/
+examples/todos/cpp/build/
+examples/todos/rust-handwritten/target/

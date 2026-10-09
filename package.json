@@ -24,7 +24,8 @@
     "test": "bun test && cd runtime && cargo test --quiet",
     "example:check": "bun compiler/src/cli.ts check examples/todos/api.ts",
     "example:build": "bun compiler/src/cli.ts build examples/todos/api.ts --out examples/todos/rust --release",
-    "example:diff": "contract/diff.sh --cases examples/todos/contract-cases.json --reset 'TRUNCATE todos RESTART IDENTITY' --cwd examples/todos 'effect=bun api.ts' 'effect-bunpg=bun api-bunpg.ts' 'rust=rust/target/release/api_server'"
+    "example:diff": "contract/diff.sh --cases examples/todos/contract-cases.json --reset 'TRUNCATE todos RESTART IDENTITY' --cwd examples/todos 'effect=bun api.ts' 'effect-bunpg=bun api-bunpg.ts' 'rust=rust/target/release/api_server'",
+    "compare": "bun examples/todos/compare-runtimes.ts"
   },
   "dependencies": {
     "typescript": "^5.9.0"
@@ -43,6 +44,7 @@
   },
   "devDependencies": {
     "@effect/platform-bun": "4.0.1",
+    "@effect/platform-node": "4.0.1",
     "@effect/sql-pg": "4.0.1",
     "@types/bun": "^1.3.0",
     "effect": "4.0.1"

@@ -7,7 +7,20 @@
     "noEmit": true,
     "skipLibCheck": true,
     "exactOptionalPropertyTypes": true,
-    "types": ["bun"]
+    "types": [
+      "bun"
+    ]
   },
-  "include": ["compiler", "bun-pg-client", "contract", "examples"]
+  "include": [
+    "compiler",
+    "bun-pg-client",
+    "contract",
+    "examples"
+  ],
+  "exclude": [
+    "**/build/**",
+    "**/.targets/**",
+    "**/rust/**",
+    "node_modules"
+  ]
 }

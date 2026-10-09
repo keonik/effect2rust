@@ -1,0 +1,20 @@
+# Hand-written Rust baseline: the todos API on axum + tokio-postgres (pipelined), written the
+# way the C++ (Drogon) baseline is, to separate "C++ vs Rust" from "driver and design choices".
+[package]
+name = "todos_rust_handwritten"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "json"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"] }
+tokio-postgres = "0.7"
+serde_json = "1"
+mimalloc = "0.1"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true

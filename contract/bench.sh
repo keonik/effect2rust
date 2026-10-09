@@ -25,6 +25,12 @@ done
 command -v oha >/dev/null || { echo "needs oha: cargo install oha" >&2; exit 2; }
 
 URL="http://localhost:$PORT"
+# Make sure nothing from a previous run still holds the port (slow shutdowns, crashed harness runs).
+free_port() {
+  for _ in $(seq 50); do lsof -t -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1 || return 0; sleep 0.2; done
+  lsof -t -nP -iTCP:"$PORT" -sTCP:LISTEN 2>/dev/null | xargs -r kill -9; sleep 0.5
+}
+stop() { kill -TERM -- -"$1" 2>/dev/null; wait "$1" 2>/dev/null; free_port; }
 wait_up() { for _ in $(seq 1000); do curl -s -o /dev/null "$URL" && return 0; sleep 0.01; done; return 1; }
 rss_sum() { ps -o rss= -g "$1" | awk '{s+=$1} END {print int(s/1024)}'; }
 hwm_sum() { for p in $(ps -o pid= -g "$1"); do awk '/VmHWM/{print $2}' /proc/$p/status 2>/dev/null; done | awk '{s+=$1} END {print int(s/1024)}'; }
@@ -34,6 +40,7 @@ for spec in "${servers[@]}"; do
   name=${spec%%=*}; cmd=${spec#*=}
   [ -n "$SEED" ] && psql -q "$DATABASE_URL" -c "$SEED"
   t0=$(date +%s%N)
+  free_port
   setsid bash -c "cd '$CWD' && $cmd" > /dev/null 2>&1 & pid=$!
   if ! wait_up; then echo "$(printf '%-24s' "$name") server didn't start: $cmd" >&2; kill -TERM -- -$pid 2>/dev/null; continue; fi
   startup=$(( ($(date +%s%N) - t0) / 1000000 ))
@@ -44,5 +51,5 @@ for spec in "${servers[@]}"; do
   [ -n "$POST" ] && line+=" POST $(oha -z "$DUR" -c "$CONN" --no-tui --output-format json -m POST -H 'content-type: application/json' -d "$BODY" "$URL$POST" | summ) |"
   procs=$(lsof -t -nP -iTCP:"$PORT" -sTCP:LISTEN 2>/dev/null | wc -l)
   echo "$line mem $(printf '%4s' "$idle")→$(printf '%4s' "$(hwm_sum $pid)") MB | start $(printf '%4s' $startup) ms | $procs proc"
-  kill -TERM -- -$pid 2>/dev/null; wait $pid 2>/dev/null; sleep 1
+  stop $pid
 done

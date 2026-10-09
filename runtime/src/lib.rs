@@ -8,8 +8,9 @@
 //! - [`read_json_body`]: HttpApiBuilder's payload handling (content-type normalization, 415,
 //!   TextDecoder + JSON.parse semantics)
 //! - JSON / path-parameter decoders matching Schema's JSON and StringTree codecs
-//! - [`Sql`]: parameters typed by value exactly like @effect/sql-pg's driver
-//!   (int4 / int8 / float8 / bool, strings untyped), and column decoding like its row parser
+//! - [`Sql`] / [`PgPool`]: pipelined tokio-postgres connections; parameters typed by value exactly
+//!   like @effect/sql-pg's driver (int4 / int8 / float8 / bool, strings untyped), and column
+//!   decoding like its row parser
 //! - [`ser_number`]: numbers encoded like JSON.stringify (non-finite as strings)
 
 use std::{future::Future, sync::Arc};
@@ -25,8 +26,6 @@ use axum::{
 };
 use serde::Serialize;
 pub use serde_json::{Map, Value};
-pub use sqlx::postgres::{PgPool, PgRow};
-use sqlx::{postgres::PgArguments, Arguments, Column, Row, TypeInfo};
 
 // ═══════════════════════════ Decoding ═══════════════════════════
 
@@ -682,12 +681,61 @@ where
 
 // ═══════════════════════════ SQL ═══════════════════════════
 
-/// A lazily connecting pool (connections open on first use, like PgClient's pool).
+pub use tokio_postgres::Row as PgRow;
+use tokio_postgres::{types::{ToSql, Type}, Client, NoTls, Statement};
+
+/// A fixed set of lazily opened connections. Each connection pipelines the queries
+/// issued on it concurrently (like Drogon's fast client), and caches one prepared
+/// statement per SQL shape.
+pub struct PgPool {
+    url: String,
+    slots: Vec<tokio::sync::Mutex<Option<Arc<Conn>>>>,
+    next: std::sync::atomic::AtomicUsize,
+}
+
+struct Conn {
+    client: Client,
+    statements: std::sync::Mutex<std::collections::HashMap<String, Statement>>,
+}
+
+/// Connections open on first use, like PgClient's pool.
 pub fn pool(url: &str, max_connections: u32) -> PgPool {
-    sqlx::postgres::PgPoolOptions::new().max_connections(max_connections).connect_lazy(url).unwrap_or_else(|e| {
-        eprintln!("invalid database url: {e}");
-        std::process::exit(1)
-    })
+    PgPool {
+        url: url.to_owned(),
+        slots: (0..max_connections.max(1)).map(|_| tokio::sync::Mutex::new(None)).collect(),
+        next: std::sync::atomic::AtomicUsize::new(0),
+    }
+}
+
+impl PgPool {
+    async fn conn(&self) -> Result<Arc<Conn>, SqlFailure> {
+        let i = self.next.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % self.slots.len();
+        let mut slot = self.slots[i].lock().await;
+        if let Some(c) = slot.as_ref() {
+            if !c.client.is_closed() {
+                return Ok(c.clone());
+            }
+        }
+        let (client, connection) = tokio_postgres::connect(&self.url, NoTls).await.map_err(sql_failure)?;
+        tokio::spawn(async move {
+            if let Err(e) = connection.await {
+                eprintln!("[postgres] connection closed: {e}");
+            }
+        });
+        let c = Arc::new(Conn { client, statements: Default::default() });
+        *slot = Some(c.clone());
+        Ok(c)
+    }
+
+    async fn prepared(&self, sql: &str) -> Result<(Arc<Conn>, Statement), SqlFailure> {
+        let c = self.conn().await?;
+        if let Some(st) = c.statements.lock().unwrap().get(sql) {
+            return Ok((c.clone(), st.clone()));
+        }
+        let st = c.client.prepare(sql).await.map_err(sql_failure)?;
+        c.statements.lock().unwrap().insert(sql.to_owned(), st.clone());
+        Ok((c, st))
+    }
 }
 
 /// What a query can fail with: the SqlError and SchemaError of `effect/sql`.
@@ -709,14 +757,14 @@ impl SqlFailure {
 /// Each combination is its own SQL text, so prepared statements are cached per shape.
 pub struct Sql {
     sql: String,
-    args: PgArguments,
+    args: Vec<Box<dyn ToSql + Sync + Send>>,
     parts: &'static [&'static str],
     n: usize,
 }
 
 impl Sql {
     pub fn new(parts: &'static [&'static str]) -> Sql {
-        Sql { sql: parts[0].to_owned(), args: PgArguments::default(), parts, n: 0 }
+        Sql { sql: parts[0].to_owned(), args: Vec::with_capacity(parts.len() - 1), parts, n: 0 }
     }
 
     fn push(&mut self, cast: &str) {
@@ -729,10 +777,10 @@ impl Sql {
 
     pub fn int(&mut self, v: i64) {
         if (i32::MIN as i64..=i32::MAX as i64).contains(&v) {
-            self.args.add(v as i32).expect("bind");
+            self.args.push(Box::new(v as i32));
             self.push("::int4");
         } else {
-            self.args.add(v).expect("bind");
+            self.args.push(Box::new(v));
             self.push("::int8");
         }
     }
@@ -743,99 +791,111 @@ impl Sql {
                 return self.int(v as i64);
             }
             if v.abs() <= 9_007_199_254_740_991.0 {
-                self.args.add(v as i64).expect("bind");
+                self.args.push(Box::new(v as i64));
                 return self.push("::int8");
             }
         }
-        self.args.add(v).expect("bind");
+        self.args.push(Box::new(v));
         self.push("::float8");
     }
 
     pub fn bool(&mut self, v: bool) {
-        self.args.add(v).expect("bind");
+        self.args.push(Box::new(v));
         self.push("::bool");
     }
 
     /// `pg_type` is the type Postgres infers for this parameter ("" when it's text).
     pub fn string(&mut self, v: &str, pg_type: &str) {
-        self.args.add(v.to_owned()).expect("bind");
+        self.args.push(Box::new(v.to_owned()));
         if pg_type.is_empty() {
-            self.push("");
+            self.push("::text");
         } else {
             self.push(&format!("::text::{pg_type}"));
         }
     }
 
     pub fn null(&mut self, pg_type: &str) {
-        self.args.add(None::<String>).expect("bind");
+        self.args.push(Box::new(None::<String>));
         self.push(&format!("::text::{pg_type}"));
     }
 
+    async fn run(self, db: &PgPool) -> Result<Vec<PgRow>, SqlFailure> {
+        let (c, st) = db.prepared(&self.sql).await?;
+        let params: Vec<&(dyn ToSql + Sync)> = self.args.iter().map(|a| a.as_ref() as &(dyn ToSql + Sync)).collect();
+        c.client.query(&st, &params).await.map_err(sql_failure)
+    }
+
     pub async fn fetch_optional(self, db: &PgPool) -> Result<Option<PgRow>, SqlFailure> {
-        sqlx::query_with(&self.sql, self.args).fetch_optional(db).await.map_err(sql_failure)
+        Ok(self.run(db).await?.into_iter().next())
     }
 
     pub async fn fetch_all(self, db: &PgPool) -> Result<Vec<PgRow>, SqlFailure> {
-        sqlx::query_with(&self.sql, self.args).fetch_all(db).await.map_err(sql_failure)
+        self.run(db).await
     }
 
     pub async fn execute(self, db: &PgPool) -> Result<(), SqlFailure> {
-        sqlx::query_with(&self.sql, self.args).execute(db).await.map(|_| ()).map_err(sql_failure)
+        self.run(db).await.map(|_| ())
     }
 }
 
-fn sql_failure(e: sqlx::Error) -> SqlFailure {
+fn sql_failure(e: tokio_postgres::Error) -> SqlFailure {
     SqlFailure::Sql(e.to_string())
-}
-
-fn col_type(row: &PgRow, i: usize) -> &str {
-    row.column(i).type_info().name()
 }
 
 fn mismatch(field: &str) -> SqlFailure {
     SqlFailure::schema(field)
 }
 
-macro_rules! get {
-    ($row:expr, $i:expr, $t:ty, $field:expr) => {
-        $row.try_get::<Option<$t>, _>($i).map_err(|_| mismatch($field))?
-    };
+fn get<'a, T: tokio_postgres::types::FromSql<'a>>(row: &'a PgRow, i: usize, field: &str) -> Result<Option<T>, SqlFailure> {
+    row.try_get::<_, Option<T>>(i).map_err(|_| mismatch(field))
 }
 
 /// Schema.Int from a column: int2 / int4 (int8 arrives as a JS BigInt and fails).
 pub fn col_int_opt(row: &PgRow, i: usize, field: &str) -> Result<Option<i64>, SqlFailure> {
-    Ok(match col_type(row, i) {
-        "INT2" => get!(row, i, i16, field).map(i64::from),
-        "INT4" => get!(row, i, i32, field).map(i64::from),
-        _ => return Err(mismatch(field)),
-    })
+    let t = row.columns()[i].type_();
+    if *t == Type::INT2 {
+        Ok(get::<i16>(row, i, field)?.map(i64::from))
+    } else if *t == Type::INT4 {
+        Ok(get::<i32>(row, i, field)?.map(i64::from))
+    } else {
+        Err(mismatch(field))
+    }
 }
 
 /// Schema.Number / Finite from a column: int2 / int4 / float4 / float8.
 pub fn col_number_opt(row: &PgRow, i: usize, field: &str) -> Result<Option<f64>, SqlFailure> {
-    Ok(match col_type(row, i) {
-        "INT2" => get!(row, i, i16, field).map(f64::from),
-        "INT4" => get!(row, i, i32, field).map(f64::from),
-        "FLOAT4" => get!(row, i, f32, field).map(f64::from),
-        "FLOAT8" => get!(row, i, f64, field),
-        _ => return Err(mismatch(field)),
-    })
+    let t = row.columns()[i].type_();
+    if *t == Type::INT2 {
+        Ok(get::<i16>(row, i, field)?.map(f64::from))
+    } else if *t == Type::INT4 {
+        Ok(get::<i32>(row, i, field)?.map(f64::from))
+    } else if *t == Type::FLOAT4 {
+        Ok(get::<f32>(row, i, field)?.map(f64::from))
+    } else if *t == Type::FLOAT8 {
+        get::<f64>(row, i, field)
+    } else {
+        Err(mismatch(field))
+    }
 }
 
 /// Schema.String from a column: text-like types and uuid (as its canonical text).
 pub fn col_string_opt(row: &PgRow, i: usize, field: &str) -> Result<Option<String>, SqlFailure> {
-    Ok(match col_type(row, i) {
-        "TEXT" | "VARCHAR" | "BPCHAR" | "NAME" => get!(row, i, String, field),
-        "UUID" => get!(row, i, uuid::Uuid, field).map(|u| u.to_string()),
-        _ => return Err(mismatch(field)),
-    })
+    let t = row.columns()[i].type_();
+    if [Type::TEXT, Type::VARCHAR, Type::BPCHAR, Type::NAME].contains(t) {
+        get::<String>(row, i, field)
+    } else if *t == Type::UUID {
+        Ok(get::<uuid::Uuid>(row, i, field)?.map(|u| u.to_string()))
+    } else {
+        Err(mismatch(field))
+    }
 }
 
 pub fn col_boolean_opt(row: &PgRow, i: usize, field: &str) -> Result<Option<bool>, SqlFailure> {
-    Ok(match col_type(row, i) {
-        "BOOL" => get!(row, i, bool, field),
-        _ => return Err(mismatch(field)),
-    })
+    if *row.columns()[i].type_() == Type::BOOL {
+        get::<bool>(row, i, field)
+    } else {
+        Err(mismatch(field))
+    }
 }
 
 fn required<T>(v: Result<Option<T>, SqlFailure>, field: &str) -> Result<T, SqlFailure> {

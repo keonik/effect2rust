@@ -22,22 +22,29 @@ done
 [ -z "$CASES" ] || [ ${#servers[@]} -lt 2 ] && { echo "usage: diff.sh --cases cases.json [--reset SQL] [--cwd DIR] [--port N] name=cmd name=cmd..." >&2; exit 2; }
 mkdir -p "$OUTDIR"
 
+# Make sure nothing from a previous run still holds the port (slow shutdowns, crashed harness runs).
+free_port() {
+  for _ in $(seq 50); do lsof -t -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1 || return 0; sleep 0.2; done
+  lsof -t -nP -iTCP:"$PORT" -sTCP:LISTEN 2>/dev/null | xargs -r kill -9; sleep 0.5
+}
+stop() { kill -TERM -- -"$1" 2>/dev/null; wait "$1" 2>/dev/null; free_port; }
 wait_up() { for _ in $(seq 500); do curl -s -o /dev/null "localhost:$PORT" && return 0; sleep 0.02; done; echo "  server didn't come up; see $OUTDIR/$1.log" >&2; return 1; }
 
 names=()
 for spec in "${servers[@]}"; do
   name=${spec%%=*}; cmd=${spec#*=}; names+=("$name")
+  free_port
   setsid bash -c "cd '$CWD' && exec $cmd" > "$OUTDIR/$name.log" 2>&1 & pid=$!
   if wait_up "$name"; then
     [ -n "$RESET" ] && psql -q "$DATABASE_URL" -c "$RESET"
     bun "$HERE/contract.ts" record "http://localhost:$PORT" "$OUTDIR/$name.json" --cases "$CASES"
   fi
-  kill -TERM -- -$pid 2>/dev/null; wait $pid 2>/dev/null; sleep 0.5
+  stop $pid
 done
 
 status=0
 for name in "${names[@]:1}"; do
-  printf "%-16s vs %-16s " "$name" "${names[0]}"
+  echo "== $name vs ${names[0]}"
   bun "$HERE/contract.ts" compare "$OUTDIR/${names[0]}.json" "$OUTDIR/$name.json" || status=1
 done
 exit $status
