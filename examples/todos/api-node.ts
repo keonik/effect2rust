@@ -1,4 +1,5 @@
 // Same program as api.ts on node:http (NodeHttpServer), for Node, Deno and their compiled forms.
+// reusePort lets several processes share port 3000 (Linux, Node ≥ 23.1); one process is unaffected.
 // deps: effect @effect/platform-bun @effect/sql-pg   (schema: ./schema.sql)
 import { NodeHttpServer, NodeRuntime } from "@effect/platform-node"
 import { createServer } from "node:http"
@@ -95,7 +96,7 @@ const ApiLive = HttpApiBuilder.layer(Api).pipe(Layer.provide(TodosLive))
 const AppLive = HttpRouter.serve(ApiLive, { disableLogger: true }).pipe(
   Layer.provide(TodoRepo.layer),
   Layer.provide(PgClient.layerConfig({ url: Config.Redacted("DATABASE_URL") })),
-  Layer.provide(NodeHttpServer.layer(createServer, { port: 3000, host: "0.0.0.0" })),
+  Layer.provide(NodeHttpServer.layer(createServer, { port: 3000, host: "0.0.0.0", reusePort: true })),
 )
 
 Layer.launch(AppLive).pipe(NodeRuntime.runMain)

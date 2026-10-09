@@ -120,24 +120,29 @@ share the cores, so compare rows, not absolute numbers:
 
 | Target | Contract | GET req/s · p99 | POST req/s · p99 | Memory | Startup | Build | Size |
 |---|---|---|---|---|---|---|---|
-| Node 22 | 69/81 (1 root diff) | 5,045 · 190 ms | 3,610 · 79 ms | 170→343 MB | 1,072 ms | | |
-| Deno 2.9 | 69/81 (1 root diff) | 4,430 · 120 ms | 3,469 · 89 ms | 131→398 MB | 595 ms | | |
-| Bun 1.4 | reference | 6,639 · 150 ms | 3,999 · 67 ms | 82→171 MB | 479 ms | | |
-| Node SEA | 69/81 (1 root diff) | 5,311 · 191 ms | 3,813 · 75 ms | 85→147 MB | 229 ms | 8.3 s | 118 MB |
-| `deno compile` | 69/81 (1 root diff) | 4,806 · 120 ms | 4,023 · 80 ms | 152→413 MB | 429 ms | 4.8 s | 186 MB |
-| `bun build --compile` | 81/81 | 6,855 · 151 ms | 4,416 · 63 ms | 54→112 MB | 90 ms | 0.7 s | 82 MB |
-| **Rust (effect2rust)** | **81/81** | **23,249 · 4.9 ms** | **9,902 · 12.4 ms** | **9→16 MB** | **32 ms** | 24 s | 1.6 MB |
-| Rust, hand-written (axum + tokio-postgres) | 31/81 (44 root diffs) | 23,748 · 5.0 ms | 9,681 · 13.6 ms | 10→14 MB | 77 ms | 57 s* | 1.5 MB |
-| C++, hand-written (Drogon) | 35/81 (39 root diffs) | 28,829 · 4.2 ms | 9,264 · 11.6 ms | 14 MB | 51 ms | 10 s* | 324 KB† |
+| Node 26 | 69/81 (1 root diff) | 6,255 · 170 ms | 4,255 · 67 ms | 179→379 MB | 789 ms | | |
+| Node 26, bundled (one ESM file) | 69/81 (1 root diff) | 6,613 · 158 ms | 4,462 · 63 ms | 80→216 MB | 181 ms | 1.8 s | 1.4 MB |
+| Node 26, bundled, 2 processes (`reusePort`) | 69/81 (1 root diff) | 8,645 · 47 ms | 4,809 · 48 ms | 166→400 MB | 320 ms | 1.5 s | 1.4 MB |
+| Deno 2.9 | 69/81 (1 root diff) | 4,652 · 111 ms | 3,639 · 87 ms | 130→389 MB | 460 ms | | |
+| Bun 1.4 | reference | 6,208 · 149 ms | 3,697 · 73 ms | 83→167 MB | 486 ms | | |
+| Node 26 SEA (`--build-sea`, ESM) | 69/81 (1 root diff) | 6,446 · 158 ms | 4,762 · 58 ms | 116→240 MB | 222 ms | 5.4 s | 145 MB |
+| `deno compile` | 69/81 (1 root diff) | 4,732 · 98 ms | 3,727 · 82 ms | 152→402 MB | 483 ms | 22 s | 186 MB |
+| `bun build --compile` | 81/81 | 6,329 · 161 ms | 3,865 · 69 ms | 54→111 MB | 87 ms | 0.7 s | 82 MB |
+| **Rust (effect2rust)** | **81/81** | **21,340 · 5.7 ms** | **10,160 · 12.4 ms** | **9→16 MB** | **39 ms** | 32 s | 1.6 MB |
+| Rust, hand-written (axum + tokio-postgres) | 31/81 (44 root diffs) | 23,466 · 5.2 ms | 9,730 · 13.2 ms | 10→13 MB | 77 ms | 57 s* | 1.5 MB |
+| C++, hand-written (Drogon) | 35/81 (39 root diffs) | 26,187 · 4.8 ms | 8,916 · 12.2 ms | 14 MB | 61 ms | 10 s* | 324 KB† |
 
 <sub>Effect targets use `@effect/sql-pg` and request logging off; Node and Deno run the same program on
-`node:http` (`api-node.ts`), Bun on `Bun.serve` (`api.ts`). JS runtimes are single-threaded;
-Rust and C++ use both cores. Builds marked * are clean builds (the table's 0.2 s were cached).
+`node:http` (`api-node.ts`), Bun on `Bun.serve` (`api.ts`). JS runtimes are single-threaded unless
+noted; Rust and C++ use both cores. Builds marked * are clean builds (the run reused cached ones).
 † dynamically linked to Drogon. "Root diffs" exclude cascades, where an earlier difference
 shifted auto-increment ids for later requests.</sub>
 
 What this shows:
 
+- **Node 26 is now the fastest JS runtime for this Effect server** (bundled: 6.6k GET vs Bun's
+  6.2k, 4.5k POST vs 3.7k), and with two processes clearly ahead; Bun still starts faster and
+  uses about half the memory.
 - **The same Effect program isn't identical across JS runtimes.** On Node and Deno, a JSON body
   starting with a UTF-8 byte-order mark is a 400; on Bun it's accepted (Bun's `request.text()`
   strips the BOM). The compiled binary follows its reference exactly.
@@ -152,7 +157,35 @@ What this shows:
   Effect API on 40+ of 81 requests. effect2rust matches all 81 while staying in the same
   performance tier.
 
-`bun run compare -- --no-build --skip-bench` re-runs just the contract. Deno compile downloads
+### Running Effect on Node 26
+
+What helped, measured on this app (Node 26.11.1 vs 22.22):
+
+- **Upgrading alone**: +15% GET throughput and ~25% faster startup over Node 22 (V8 14.6).
+  Peak memory rose (~360 vs ~250 MB unbundled), which bundling more than recovers.
+- **Bundle to one ESM file** (esbuild, `--format=esm`, not minified): idle memory 179 → 80 MB,
+  startup ~800 → ~180 ms, throughput the same or better. Running `.ts` from `node_modules`
+  means resolving and type-stripping hundreds of files at startup. Minifying didn't help.
+- **`reusePort` + one process per core**: 2 processes gave +25–31% GET and cut p99 from ~160 to
+  ~47 ms on this 2-core box (shared with the load generator and Postgres). Effect's
+  `NodeHttpServer.layer` passes `reusePort: true` straight to `listen()` (Linux, Node ≥ 23.1).
+- **SEA with `--build-sea`** (Node ≥ 25.5): builds and injects in one step, and with
+  `"mainFormat": "module"` the ESM bundle goes in as-is, with no postject and no CommonJS
+  conversion. Startup ~220 ms; the binary is 145 MB (the Node 26 executable is larger).
+
+What didn't:
+
+- **`--max-semi-space-size`** (16→128 MB): no throughput change, more memory. GC isn't the
+  bottleneck; Effect's fiber runtime is.
+- **`NODE_COMPILE_CACHE`**: no measurable startup gain once bundled.
+- **SEA startup snapshots** (`useSnapshot`): fail to build. `node:http`'s parser can't be
+  serialized into a V8 snapshot, and `@effect/platform-node` imports it at load time.
+
+For production: `esbuild --bundle --format=esm` + `node bundle.mjs`, one process per core with
+`reusePort`, request logging off unless you need it. A SEA only if you need a single file.
+
+`bun run compare -- --no-build --skip-bench` re-runs just the contract. Node targets need
+Node ≥ 26 (`NODE_BIN=/path/to/node` to pick one). Deno compile downloads
 `denort` unless `DENORT_BIN` points at a local copy; the C++ target needs Drogon
 (`apt install libdrogon-dev libpq-dev libjsoncpp-dev uuid-dev`).
 

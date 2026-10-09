@@ -8,6 +8,9 @@
 // For each target: build it (timed), check the 81-case contract against the reference
 // (Effect on Bun), then load-test it with contract/bench.sh. Targets whose toolchain is
 // missing are skipped. Deno compile honors DENORT_BIN for offline builds.
+//
+// Node targets need Node ≥ 26 (NODE_BIN to pick a binary): SEAs are built with the built-in
+// `--build-sea` straight from an ESM bundle, and the multi-process target uses reusePort.
 import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 
@@ -32,6 +35,20 @@ const sh = (cmd: string, cwd = here) => {
   if (r.exitCode !== 0) throw new Error(`${cmd}\n${r.stderr.toString().slice(-2000)}${r.stdout.toString().slice(-1000)}`)
   return r.stdout.toString()
 }
+const NODE = process.env.NODE_BIN ?? "node"
+const nodeVersion = (() => {
+  try {
+    return sh(`${NODE} -v`).trim()
+  } catch {
+    return null
+  }
+})()
+const nodeOk = nodeVersion !== null && Number(nodeVersion.slice(1).split(".")[0]) >= 26
+if (nodeVersion && !nodeOk) console.log(`- ${NODE} is ${nodeVersion}; Node targets need ≥ 26 (set NODE_BIN), skipping them`)
+// One plain (unminified) ESM bundle: no node_modules resolution or type stripping at startup.
+// Minifying didn't help throughput; createRequire covers CommonJS deps that require() built-ins.
+const nodeBundle = () =>
+  sh(`npx --yes esbuild@0.25 api-node.ts --bundle --platform=node --target=node24 --format=esm --outfile=${out}/node-bundle.mjs --log-level=error --banner:js="import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);"`)
 const size = (p: string) => {
   const b = existsSync(p) ? statSync(p).size : 0
   return b > 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${Math.round(b / 1024)} KB`
@@ -44,21 +61,41 @@ interface Target {
   needs: string[]
   build?: () => string | null // returns the artifact path (for size)
   note?: string
+  node?: boolean // needs Node ≥ 26
 }
 
 const targets: Target[] = [
-  { name: "node", kind: "Effect 4, interpreted", cmd: "node api-node.ts", needs: ["node"] },
+  { name: "node", kind: "Effect 4, interpreted", cmd: `${NODE} api-node.ts`, needs: [], node: true },
+  {
+    name: "node (bundled)",
+    kind: "Effect 4, one ESM file",
+    cmd: `${NODE} ${out}/node-bundle.mjs`,
+    needs: ["npx"],
+    node: true,
+    build: () => (nodeBundle(), `${out}/node-bundle.mjs`),
+  },
+  {
+    name: "node (bundled, 2 procs)",
+    kind: "Effect 4, reusePort",
+    cmd: `${NODE} ${out}/node-bundle.mjs & ${NODE} ${out}/node-bundle.mjs & wait`,
+    needs: ["npx"],
+    node: true,
+    build: () => (nodeBundle(), `${out}/node-bundle.mjs`),
+  },
   { name: "deno", kind: "Effect 4, interpreted", cmd: "deno run -A api-node.ts", needs: ["deno"] },
   { name: "bun", kind: "Effect 4, interpreted", cmd: "bun api.ts", needs: ["bun"] },
   {
     name: "node SEA",
     kind: "Effect 4, compiled",
     cmd: `${out}/node-sea`,
-    needs: ["node", "npx"],
+    needs: ["npx"],
+    node: true,
     build: () => {
-      sh(`npx --yes esbuild@0.25 api-node.ts --bundle --platform=node --target=node22 --format=cjs --minify --define:import.meta.env=undefined --outfile=${out}/sea.cjs --log-level=error`)
-      writeFileSync(`${out}/sea-config.json`, JSON.stringify({ main: `${out}/sea.cjs`, output: `${out}/sea-prep.blob`, disableExperimentalSEAWarning: true }))
-      sh(`node --experimental-sea-config ${out}/sea-config.json && cp "$(command -v node)" ${out}/node-sea && npx --yes postject ${out}/node-sea NODE_SEA_BLOB ${out}/sea-prep.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2`)
+      // Node ≥ 25.5: --build-sea generates and injects in one step, and ESM entry points work,
+      // so the ESM bundle goes in as-is (no postject, no CommonJS conversion).
+      nodeBundle()
+      writeFileSync(`${out}/sea-config.json`, JSON.stringify({ main: `${out}/node-bundle.mjs`, mainFormat: "module", output: `${out}/node-sea`, disableExperimentalSEAWarning: true }))
+      sh(`${NODE} --build-sea ${out}/sea-config.json`)
       return `${out}/node-sea`
     },
   },
@@ -104,6 +141,7 @@ const rows: Record<string, string>[] = []
 const active: Target[] = []
 for (const t of targets) {
   if (only && !only.includes(t.name)) continue
+  if (t.node && !nodeOk) continue
   const missing = t.needs.filter((n) => !has(n))
   if (missing.length) {
     console.log(`- skipping ${t.name}: missing ${missing.join(", ")}`)
@@ -183,10 +221,11 @@ if (!skipBench) active.forEach((t, i) => {
   console.log(`  ${t.name}: ${m ? `${m[1]} GET/s, ${m[3]} POST/s` : "failed"}`)
 })
 
+const kindOf = (r: Record<string, string>) => (r.target!.startsWith("node") && nodeVersion ? `${r.kind} (Node ${nodeVersion.slice(1)})` : r.kind)
 const table = [
   "| Target | Kind | Contract | GET req/s · p99 | POST req/s · p99 | Memory | Startup | Build | Size |",
   "|---|---|---|---|---|---|---|---|---|",
-  ...rows.map((r) => `| ${r.target} | ${r.kind} | ${r.contract} | ${r.get} · ${r.getP99} ms | ${r.post} · ${r.postP99} ms | ${r.mem} | ${r.start} | ${r.build} | ${r.size} |`),
+  ...rows.map((r) => `| ${r.target} | ${kindOf(r)} | ${r.contract} | ${r.get} · ${r.getP99} ms | ${r.post} · ${r.postP99} ms | ${r.mem} | ${r.start} | ${r.build} | ${r.size} |`),
 ].join("\n")
 console.log(`\n${table}\n`)
 if (mismatches.length) console.log(`Contract differences vs the reference:\n${mismatches.map((m) => `- ${m}`).join("\n")}\n`)
